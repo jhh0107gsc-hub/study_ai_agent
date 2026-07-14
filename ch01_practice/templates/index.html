@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Playground</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+
+<div class="container">
+
+    <header>
+        <h1>AI Playground</h1>
+        <p class="subtitle">페르소나와 모델을 선택하고 생성 파라미터를 조절하며 응답을 비교해보세요.</p>
+    </header>
+
+    <!-- 상단 설정 -->
+    <section class="settings-panel">
+
+        <!-- 페르소나 -->
+        <div class="setting-card">
+
+            <h2>페르소나</h2>
+
+            <div class="persona-selector">
+
+                {% for id, persona in personas.items() %}
+                <button class="persona-btn" data-persona="{{ id }}">
+
+                    <strong>{{ persona.name }}</strong>
+                    <span>{{ persona.description }}</span>
+
+                </button>
+                {% endfor %}
+
+            </div>
+
+        </div>
+
+        <!-- 모델 -->
+        <div class="setting-card">
+
+            <h2>모델 설정</h2>
+
+            <div class="setting-group">
+
+                <label for="model-select">Model</label>
+
+                <select id="model-select">
+
+                    {% for id, model in models.items() %}
+
+                    <option value="{{ id }}">
+                        {{ model.name }}
+                    </option>
+
+                    {% endfor %}
+
+                </select>
+
+            </div>
+
+            <div class="setting-group">
+
+                <label for="temperature">
+                    Temperature
+                    <span id="temp-value">1.0</span>
+                </label>
+
+                <input id="temperature" type="range" min="0" max="1" step="0.1" value="1.0">
+
+            </div>
+
+            <div class="setting-group">
+
+                <label for="max-tokens">
+                    Max Tokens
+                    <span id="tokens-value">1024</span>
+                </label>
+
+                <input id="max-tokens" type="range" min="64" max="4096" step="64" value="1024">
+
+            </div>
+
+        </div>
+
+    </section>
+
+    <!-- 채팅 -->
+    <section class="chat-section">
+
+        <div id="chat-box" class="chat-box">
+
+            <div class="system-message">
+
+                <p>① 페르소나를 선택하세요.</p>
+                <p>② 모델과 생성 파라미터를 설정하세요.</p>
+                <p>③ 질문을 입력하여 응답을 비교해보세요.</p>
+
+            </div>
+
+        </div>
+
+    </section>
+
+    <!-- 입력 -->
+    <section class="input-section">
+
+        <input type="text" id="user-input" placeholder="메시지를 입력하세요..." autocomplete="off">
+
+        <button id="send-btn">전송</button>
+
+        <button id="reset-btn">초기화</button>
+
+    </section>
+
+    <!-- 토큰 -->
+    <footer>
+
+        <div id="token-info"></div>
+
+    </footer>
+
+</div>
+
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+
+</body>
+</html>
