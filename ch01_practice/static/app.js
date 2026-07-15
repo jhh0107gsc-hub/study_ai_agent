@@ -170,19 +170,30 @@ async function sendMessage() {
 
                     chatBox.scrollTop = chatBox.scrollHeight;
                 }
+
+                // 에러 발생 시
+                if (data.error) {
+                    assistantDiv.querySelector(".text").textContent +=
+                        `\n[오류] ${data.error}`;
+                }
                 
-                // 응답이 전부 끝난 뒤, 명시적으로 "finished": True가 전달되면
+                // 응답이 전부 끝나거나 에러 발생 시, 명시적으로 "finished": True가 전달되면
                 if (data.finished) {
-                    // 입출력 토큰 정보와 소요 시간을 화면에 표시
-                    tokenInfo.textContent =
-                        `입력 ${data.input_tokens}토큰 / 출력 ${data.output_tokens}토큰 / 소요 시간 : ${data.elapsed}초`
+                    // 정상 응답 종료 시 입출력 토큰 정보와 소요 시간을 화면에 표시
+                    if (!data.error) {
+                        tokenInfo.textContent =
+                            `입력 ${data.input_tokens}토큰 / 출력 ${data.output_tokens}토큰 / 소요 시간 : ${data.elapsed}초`
+                    // 에러 발생 시 토큰 없이 시간만 표시
+                    } else {
+                    tokenInfo.textContent = `소요 시간 : ${data.elapsed}초`
+                    }
                 }
             }
         }
 
     } catch {
         assistantDiv.querySelector(".text").textContent =
-            "[오류] 응답을 받지 못했습니다.";
+            "[오류] 요청이 실패하였습니다.";
     }
 
     isStreaming = false;

@@ -1,8 +1,16 @@
 import json
 import time
 from flask import Flask, render_template, request, Response, stream_with_context
-from dotenv import load_dotenv
-from anthropic import Anthropic
+from dotenv import load_dotenv, find_dotenv
+from anthropic import (
+    Anthropic,
+    APIError,
+    AuthenticationError,
+    RateLimitError,
+    APITimeoutError,
+    BadRequestError,
+    NotFoundError,
+)
 
 load_dotenv()
 
@@ -41,7 +49,7 @@ PERSONAS = {
 
 MODELS = {
     "haiku": {
-        "id": "claude-haiku-4-5-20251001",
+        "id": "claude-haiku-4-5",
         "name": "Haiku 4.5",
         "description": "빠르고 저렴 — 간단한 작업에 적합",
     },
@@ -112,48 +120,62 @@ def chat():
         """
         스트리밍 방식으로 토큰을 생성합니다.
         """
-    
         start_time = time.perf_counter()
-        
+
+        try:
         # 모델, 시스템 프롬프트, 메세지와 함께 파라미터 temperature, max_tokens을 보낸다.
-        with client.messages.stream(
-            model=model_id,
-            system=persona["system"],
-            temperature=temperature,
-            max_tokens=max_tokens,
-            messages=history,
-        ) as stream:
-            full_response = ""
-            
-            # 생성된 문자열 토큰을 받을 때 마다 SSE 형식으로 데이터를 보내기
-            # 클라이언트는 "data: JSON 문자열" 형식으로 응답을 받는다.
-            
-            # 아래의 Response에 의해 generate 가 반환하는 제네레이터 객체의 next 메서드를 호출하며 이 코드를 동작시킨다.
-            # stream.text_stream 은 동기이기 때문에 Claude가 토큰을 보내오기 전까지 잠시 멈췄다가
-            # 토큰이 도착하면 클라이언트로 전송하고 next 메서드가 호출되어 다음 토큰을 기다리는 과정을 반복한다.
-            for text in stream.text_stream:
-                full_response += text
-                yield f"data: {json.dumps({'text': text})}\n\n"
+            with client.messages.stream(
+                model=model_id,
+                system=persona["system"],
+                temperature=temperature,
+                max_tokens=max_tokens,
+                messages=history,
+            ) as stream:
+                full_response = ""
 
-            # 만약 응답이 끝났다면, Anthropic SDK에서 응답이 종료됨을 알려 stream.text_stream을 끝낸다.
-            # 이후 전체 완성된 응답을 히스토리에 추가한다.
-            history.append({
-                "role": "assistant",
-                "content": full_response
-            })
+                # 생성된 문자열 토큰을 받을 때 마다 SSE 형식으로 데이터를 보내기
+                # 클라이언트는 "data: JSON 문자열" 형식으로 응답을 받는다.
 
-            elapsed = round(time.perf_counter() - start_time, 2)
-            
-            # stream.get_final_message()은 Claude의 최종 응답으로, usage는 토큰 정보를 담고 있다.
-            usage = stream.get_final_message().usage
+                # 아래의 Response에 의해 generate 가 반환하는 제네레이터 객체의 next 메서드를 호출하며 이 코드를 동작시킨다.
+                # stream.text_stream 은 동기이기 때문에 Claude가 토큰을 보내오기 전까지 잠시 멈췄다가
+                # 토큰이 도착하면 클라이언트로 전송하고 next 메서드가 호출되어 다음 토큰을 기다리는 과정을 반복한다.
+                for text in stream.text_stream:
+                    full_response += text
+                    yield f"data: {json.dumps({'text': text})}\n\n"
 
-            # 제네레이터에서 마지막으로 응답이 종료되었음을 명시적으로 알리며, 토큰 정보와 소요 시간을 함께 보낸다.
-            yield f"data: {json.dumps({
-                'finished': True,
-                'input_tokens': usage.input_tokens,
-                'output_tokens': usage.output_tokens,
-                'elapsed': elapsed
-            })}\n\n"
+                # 만약 응답이 끝났다면, Anthropic SDK에서 응답이 종료됨을 알려 stream.text_stream을 끝낸다.
+                # 이후 전체 완성된 응답을 히스토리에 추가한다.
+                history.append({
+                    "role": "assistant",
+                    "content": full_response
+                })
+
+                elapsed = get_elapsed_time(start_time)
+
+                # stream.get_final_message()은 Claude의 최종 응답으로, usage는 토큰 정보를 담고 있다.
+                usage = stream.get_final_message().usage
+
+                # 제네레이터에서 마지막으로 응답이 종료되었음을 명시적으로 알리며, 토큰 정보와 소요 시간을 함께 보낸다.
+                yield f"data: {json.dumps({
+                    'finished': True,
+                    'input_tokens': usage.input_tokens,
+                    'output_tokens': usage.output_tokens,
+                    'elapsed': elapsed
+                })}\n\n"
+
+        # 잘못된 모델명, 기존 모델명이 더 이상 지원되지 않을 때
+        except NotFoundError:
+            elapsed = get_elapsed_time(start_time)
+            yield error_handler("잘못된 모델명, 다른 모델을 시도해주세요.", elapsed)
+
+        except BadRequestError:
+            elapsed = get_elapsed_time(start_time)
+            yield error_handler("잘못된 모델명, 다른 모델을 시도해주세요.", elapsed)
+
+        # 잘못된 API 키, 키가 만료되어 더 이상 사용할 수 없을 때
+        except AuthenticationError:
+            elapsed = get_elapsed_time(start_time)
+            yield error_handler("잘못된 API 키입니다.", elapsed)
 
     # Response는 Flask의 HTTP 응답 객체이다.
     # 인수로 제네레이터 객체를 전달함으로써 제네레이터를 반복하며 yield하는 토큰이 담긴 문자열을 보낸다.
@@ -179,6 +201,17 @@ def reset():
     conversations.pop(conv_key, None)
 
     return {"status": "ok"}
+
+def error_handler(error_msg, elapsed):
+    return f"data: {json.dumps({
+        'finished': True,
+        'error': error_msg,
+        'elapsed': elapsed
+    })}\n\n"
+
+def get_elapsed_time(start_time):
+    return round(time.perf_counter() - start_time, 2)
+
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
