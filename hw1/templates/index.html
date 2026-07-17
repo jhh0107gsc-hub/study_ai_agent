@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Prompt Lab</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+
+    <main class="app-container">
+
+        <!-- 프롬프트 조각을 선택하는 패널 -->
+        <aside class="prompt-panel">
+            <div class="panel-header">
+                <h2>프롬프트 조각</h2>
+                <button type="button" class="clear-button">Clear All</button>
+            </div>
+
+            <div class="prompt-list">
+                {% for key, piece in prompt_pieces.items() %}
+                <section class="prompt-group {{ key }}">
+                    <h3>{{ piece.title }}</h3>
+
+                    {% for option in piece.options %}
+                    <label>
+                        <input
+                                type="{{ piece.type }}"
+                                name="{{ key }}"
+                                value="{{ option.value }}"
+                                data-label="{{ option.label }}"
+                        >
+                        {{ option.label }}
+                    </label>
+                    {% endfor %}
+                </section>
+                {% endfor %}
+            </div>
+        </aside>
+
+        <!-- 선택된 프롬프트, 질문과 응답을 확인하는 워크 스페이스 영역 -->
+        <section class="workspace">
+
+            <header class="app-header">
+                <h1>프롬프트 실험실</h1>
+                <p>프롬프트 조각을 조합하고 AI의 응답을 비교해보세요.</p>
+            </header>
+
+            <!-- 선택된 프롬프트 조각들 -->
+            <section class="selected-area">
+
+                <strong>선택된 프롬프트 조각들</strong>
+
+                <div class="selected-tags">
+                    <!-- 예시 -->
+                    <span class="tag rules-tag">
+                        Rules: 추측하지 않기
+                        <button type="button">×</button>
+                    </span>
+
+                </div>
+
+                <button class="clear-button" type="button">Clear All</button>
+
+            </section>
+
+            <!-- 사용자의 질문 영역 -->
+            <section class="card question-card">
+
+                <h2>💬 Question</h2>
+
+                <textarea id="question" placeholder="질문을 입력하세요..."></textarea>
+
+                <button class="generate-button" type="button">✧ 응답 생성</button>
+
+            </section>
+
+            <!-- AI의 응답 영역 -->
+            <section class="card response-card">
+
+                <h2>🤖 Response</h2>
+
+                <article id="response">
+
+                </article>
+
+            </section>
+
+        </section>
+
+    </main>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+
+</html>
