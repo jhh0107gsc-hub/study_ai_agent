@@ -100,7 +100,7 @@ body {
     color: #7c3aed;
 }
 
-.style {
+.styles {
     border-left: 4px solid #3b82f6;
 }
 
@@ -237,12 +237,17 @@ body {
     font-size: 16px;
 }
 
+.role-tag {
+    color: #db2777;
+    border-color: #f472b6;
+}
+
 .tone-tag {
     color: #7c3aed;
     border-color: #a78bfa;
 }
 
-.style-tag {
+.styles-tag {
     color: #2563eb;
     border-color: #60a5fa;
 }
@@ -373,39 +378,4 @@ article li {
 .prompt-list::-webkit-scrollbar-track,
 .workspace::-webkit-scrollbar-track {
     background-color: #f1f1f1;
-}
-
-/* ---------- Small Screens ---------- */
-
-@media screen and (max-width: 900px) {
-
-    body {
-        padding: 15px;
-    }
-
-    .app-container {
-        display: block;
-        height: auto;
-    }
-
-    .prompt-panel {
-        width: 100%;
-        min-width: 0;
-        height: 500px;
-
-        margin-bottom: 20px;
-    }
-
-    .workspace {
-        overflow: visible;
-    }
-
-    .selected-area {
-        align-items: flex-start;
-        flex-direction: column;
-    }
-
-    .app-header h1 {
-        font-size: 34px;
-    }
 }
