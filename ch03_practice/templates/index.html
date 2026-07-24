@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>멀티툴 어시스턴트 — Chapter 3 실습</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>멀티툴 어시스턴트</h1>
+            <p class="subtitle">LLM이 도구를 선택하고 실행하는 과정을 관찰하세요</p>
+        </header>
+
+        <!-- 현재 Agent가 사용할 수 있는 도구 목록 -->
+        <div class="tool-list">
+            {% for name, info in tool_info.items() %}
+            <span class="tool-badge">{{ info.icon }} {{ info.label }}</span>
+            {% endfor %}
+        </div>
+
+        <!-- 대화와 도구 실행 과정이 표시되는 영역 -->
+        <div id="chat-area" class="chat-area">
+            <div id="messages" class="messages">
+                <div class="system-msg">
+                    도구를 활용하는 AI 어시스턴트입니다.<br>
+                    "서울 날씨 알려줘", "100달러를 원화로", "2의 10승은?" 등을 시도해보세요.
+                </div>
+            </div>
+        </div>
+
+        <!-- 사용자 메시지 입력 영역 -->
+        <div class="input-area">
+            <input type="text" id="user-input" placeholder="메시지를 입력하세요..."
+                   onkeydown="if(event.key === 'Enter') sendMessage()">
+            <button id="send-btn" onclick="sendMessage()">전송</button>
+            <button id="reset-btn" onclick="resetChat()">초기화</button>
+        </div>
+
+        <!-- 누적 토큰 사용량 표시 -->
+        <div id="token-info" class="token-info"></div>
+    </div>
+
+    <script>
+        const sessionId = crypto.randomUUID();
+
+        async function sendMessage() {
+            const input = document.getElementById('user-input');
+            const message = input.value.trim();
+            if (!message) return;
+
+            appendMessage('user', message);
+            input.value = '';
+            input.disabled = true;
+            document.getElementById('send-btn').disabled = true;
+
+            // 텍스트와 도구 실행 과정을 함께 담을 응답 영역을 만듭니다.
+            const assistantDiv = appendMessage('assistant', '');
+            const textSpan = assistantDiv.querySelector('.text');
+
+            try {
+                const response = await fetch('/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message, session_id: sessionId }),
+                });
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop();
+
+                    for (const line of lines) {
+                        if (!line.startsWith('data: ')) continue;
+                        const data = JSON.parse(line.slice(6));
+
+                        // 모델이 요청한 도구 호출을 화면에 표시합니다.
+                        if (data.tool_call) {
+                            const tc = data.tool_call;
+                            const toolDiv = document.createElement('div');
+                            toolDiv.className = 'tool-step tool-calling';
+                            toolDiv.innerHTML = `
+                                <span class="tool-icon">${tc.icon}</span>
+                                <span class="tool-label">${tc.label}</span>
+                                <span class="tool-input">${JSON.stringify(tc.input)}</span>
+                                <span class="tool-status">호출 중...</span>
+                            `;
+                            textSpan.before(toolDiv);
+                            scrollToBottom();
+                        }
+
+                        // 도구 실행 결과에 따라 상태를 완료/실패로 바꿉니다.
+                        if (data.tool_result) {
+                            const tr = data.tool_result;
+                            const toolDivs = assistantDiv.querySelectorAll('.tool-step.tool-calling');
+                            const lastTool = toolDivs[toolDivs.length - 1];
+                            if (lastTool) {
+                                lastTool.classList.remove('tool-calling');
+                                lastTool.classList.add(tr.is_error ? 'tool-error' : 'tool-success');
+                                lastTool.querySelector('.tool-status').textContent =
+                                    tr.is_error ? '실패' : '완료';
+                            }
+                            scrollToBottom();
+                        }
+
+                        // 최종 답변 텍스트를 이어 붙입니다.
+                        if (data.text) {
+                            textSpan.textContent += data.text;
+                            scrollToBottom();
+                        }
+
+                        // 응답이 끝나면 토큰 사용량을 표시합니다.
+                        if (data.done) {
+                            document.getElementById('token-info').textContent =
+                                `토큰 사용량 — 입력: ${data.input_tokens} / 출력: ${data.output_tokens}`;
+                        }
+                    }
+                }
+            } catch (error) {
+                textSpan.textContent = '[오류] 응답을 받지 못했습니다.';
+            }
+
+            input.disabled = false;
+            document.getElementById('send-btn').disabled = false;
+            input.focus();
+        }
+
+        function appendMessage(role, text) {
+            const messages = document.getElementById('messages');
+            const div = document.createElement('div');
+            div.className = `message ${role}`;
+            div.innerHTML = `
+                <span class="role">${role === 'user' ? '나' : '어시스턴트'}</span>
+                <span class="text">${text}</span>
+            `;
+            messages.appendChild(div);
+            scrollToBottom();
+            return div;
+        }
+
+        function scrollToBottom() {
+            const chatArea = document.getElementById('chat-area');
+            chatArea.scrollTop = chatArea.scrollHeight;
+        }
+
+        async function resetChat() {
+            await fetch('/reset', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ session_id: sessionId }),
+            });
+            document.getElementById('messages').innerHTML = `
+                <div class="system-msg">대화가 초기화되었습니다.</div>
+            `;
+            document.getElementById('token-info').textContent = '';
+        }
+    </script>
+</body>
+</html>

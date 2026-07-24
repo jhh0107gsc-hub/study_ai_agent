@@ -144,6 +144,7 @@ input[type="range"] {
 
     display: flex;
     flex-direction: column;
+    gap: 14px;
 
     background: white;
     border: 1px solid #d8d8d8;
@@ -155,12 +156,6 @@ input[type="range"] {
 .system-message {
     text-align: center;
     color: #666;
-}
-
-.messages {
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
 }
 
 .message {

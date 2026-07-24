@@ -11,3 +11,4 @@ build/
 tests/
 *.db
 .MD
+.idea
